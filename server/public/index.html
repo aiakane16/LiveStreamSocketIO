@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <style>
+    html, body {
+padding: 0px;
+margin: 0px;
+}
+
+video {
+background: #CCC;
+}
+
+.container {
+width: 100%;
+}
+
+.video-large {
+width: 75%;
+float: left;
+}
+
+.users-container {
+width: 21%;
+float: left;
+padding: 2%;
+position: relative;
+}
+
+.video-small {
+margin-top: 20px;
+width: 100%;
+}
+
+#users div {
+color: red;
+text-decoration: underline;
+cursor: pointer;
+}
+
+#users .active {
+color: #000;
+cursor: default;
+}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <video class="video-large" autoplay></video>
+        <div class="users-container" id="users-container">
+            <h4>Users</h4>
+        <div id="users"></div>
+    </div>
+    <script src="socket.io.js"></script>
+    <script>
+    (function(){
+        var answersFrom = {};
+        var offer;
+
+        var peerConnection = window.RTCPeerConnection ||
+                            window.mozRTCPeerConnection ||
+                            window.webkitRTCPeerConnection ||
+                            window.msRTCPeerConnection;
+
+        var sessionDescription = window.RTCSessionDescription ||
+                                window.mozRTCSessionDescription ||
+                                window.webkitRTCSessionDescription ||
+                                window.msRTCSessionDescription;
+
+        navigator.getMedia = navigator.getUserMedia || 
+                            navigator.webkitGetUserMedia ||
+                            navigator.mozGetUserMedia ||
+                            navigator.msGetUserMedia;
+
+        var socket = io('https://3000-e30b46dc-4e8b-4cff-a247-c50875616ecd.ws-ap01.gitpod.io/')
+
+
+        var pc = new peerConnection({ iceServers: [{ url: 'stun:stun.services.mozilla.com',
+            username: 'somename',
+            credential: 'somecredentials'
+            }]
+        });
+
+        function error (err) {
+            console.warn(err);
+        }
+
+        pc.onaddstream = function (obj) {
+            var vid = document.createElement('video');
+            vid.setAttribute('class', 'video-small');
+            vid.setAttribute('autoplay', 'autoplay');
+            vid.setAttribute('id', 'video-small');
+            document.getElementById('users-container').appendChild(vid);
+            vid.srcObject = obj.stream;
+        }
+
+        var answersFrom = {};
+
+        navigator.getUserMedia({ video:true, audio: true }, function (stream) {
+            var video = document.querySelector('video');
+            video.srcObject = stream;
+            pc.addStream(stream);
+        }, error);
+
+        function createOffer(id) {
+            pc.createOffer(function(offer) {
+                pc.setLocalDescription(new sessionDescription(offer), function () {
+                    socket.emit('make-offer', {
+                        offer: offer,
+                        to: id
+                    });
+                }, error);
+            }, error);
+        }
+
+        socket.on('answer-made', function (data) {
+            pc.setRemoteDescription(new sessionDescription(data.answer), function () {
+                document.getElementById(data.socket).setAttribute('class', 'active');
+                if (!answersFrom[data.socket]) {
+                    createOffer(data.socket);
+                    answersFrom[data.socket] = true;
+                }
+            }, error);
+        });
+
+        socket.on('offer-made', function (data) {
+            offer = data.offer;
+            pc.setRemoteDescription(new sessionDescription(data.offer), function () {
+                pc.createAnswer(function (answer) {
+                    pc.setLocalDescription(new sessionDescription(answer), function () {
+                        socket.emit('make-answer', {
+                            answer: answer,
+                            to: data.socket
+                        });
+                    }, error);
+                }, error);
+            }, error);
+        });
+
+        socket.on('add-users', function (data) {
+            for (var i = 0; i<data.users.length; i++) {
+                var el = document.createElement('div'),
+                id = data.users[i];
+
+                el.setAttribute('id', id);
+                el.innerHTML = id;
+                el.addEventListener('click', function () {
+                createOffer(id);
+                        });
+                document.getElementById('users').appendChild(el);
+            }
+        });
+
+        socket.on('remove-user', function (id) {
+            var div = document.getElementById(id);
+            document.getElementById('users').removeChild(div);
+        });
+
+    })();
+        
+    </script>
+</body>
+</html>
