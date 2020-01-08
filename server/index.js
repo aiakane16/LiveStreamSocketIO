@@ -23,6 +23,7 @@ io.on('connection',function(client){
 
     client.on('make-offer',function(data){
         console.log('make-offer')
+        //transform data here
         client.broadcast.emit('offer-made',{
             offer : data.offer,
             socket : client.id
@@ -32,6 +33,7 @@ io.on('connection',function(client){
 
     client.on('make-answer',function(data){
         console.log('make-answer')
+        //transform data here
         client.broadcast.emit('answer-made',{
             socket : client.id,
             answer : data.answer
