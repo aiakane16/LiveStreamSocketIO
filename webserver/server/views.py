@@ -23,6 +23,7 @@ class Detector(APIView):
 
     def post(self, request):
         #url = request.POST.get('image_url','')
+        print(request)
         image_file = request.FILES.get('image', False)
 
         if image_file:

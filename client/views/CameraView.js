@@ -40,7 +40,7 @@ export default class CameraView extends Component {
 
     handlePhotoUpload = (photo) => {
         console.log('photo upload trigger')
-        console.log(photo)
+
         const {navigate} = this.props.navigation;
         const data = new FormData();
     
@@ -50,31 +50,30 @@ export default class CameraView extends Component {
             type: 'image/jpg'
         });
 
-        fetch("https://eb073cce.ngrok.io/test", {
-            method: "POST",
-            body: data,
-          })
-          .then(function(response){
-            console.log('sample success')
-          })
-          .catch(function(error){
-              console.log('sample error')
-          })
+        // fetch("http://192.168.254.102:8000/test", {
+        //     method: "POST",
+        //     body: data,
+        //   })
+        //   .then(function(response){
+        //     console.log('sample success')
+        //   })
+        //   .catch(function(error){
+        //       console.log('sample error')
+        //   })
           
-        fetch("https://eb073cce.ngrok.io/predict", {
+        fetch("http://192.168.254.102:8000/predict", {
             method: "POST",
             body: data,
           })
             .then(response => {
               console.log("upload succes", response);
-              alert("Upload success!");
               navigate('ImageView', { imageURI: photo.uri })
 
             })
             .catch(error => {
               console.log("upload error", error);
               alert("Upload failed!");
-              navigate('ImageView',{ imageURI: photo.uri })
+            //   navigate('ImageView',{ imageURI: photo.uri })
             });
     };
 
