@@ -8,12 +8,12 @@ export default ({captures=[], handlePhotoUpload }) => (
         horizontal={true}
         style={[styles.bottomToolbar, styles.galleryContainer]} 
     >
-        {captures.map(({ uri }) => (
-            <View style={styles.galleryImageContainer} key={uri}>
+        {captures.map((photo) => (
+            <View style={styles.galleryImageContainer} key={photo.uri}>
                 <TouchableOpacity
-                    onPress={()=> handlePhotoUpload(uri)}    
+                    onPress={()=> handlePhotoUpload(photo)}    
                 >
-                    <Image source={{ uri }} style={styles.galleryImage} />
+                    <Image source={{ uri: photo.uri }} style={styles.galleryImage} />
                 </TouchableOpacity>
             </View>
         ))}

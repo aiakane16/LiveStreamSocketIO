@@ -39,37 +39,43 @@ export default class CameraView extends Component {
     };
 
     handlePhotoUpload = (photo) => {
+        console.log('photo upload trigger')
+        console.log(photo)
         const {navigate} = this.props.navigation;
-        navigate('ImageView', { imageURI: photo })
-
-        // var createFormData = function(photo,body){
-        //     const data = new FormData();
+        const data = new FormData();
     
-        //     data.append("photo", {
-        //       uri:
-        //         Platform.OS === "android" ? photo.uri : photo.uri.replace("file://", "")
-        //     });
-          
-        //     Object.keys(body).forEach(key => {
-        //       data.append(key, body[key]);
-        //     });
-          
-        //     return data;
-        // };
+        data.append("image", {
+            uri: photo.uri,
+            name: 'sample',
+            type: 'image/jpg'
+        });
 
-        // fetch("http://localhost:3000/api/upload", {
-        //     method: "POST",
-        //     body: createFormData(photo, { })
-        //   })
-        //     .then(response => {
-        //       console.log("upload succes", response);
-        //       alert("Upload success!");
-        //     })
-        //     .catch(error => {
-        //       console.log("upload error", error);
-        //       alert("Upload failed!");
-        //       navigate('ImageView',{ imageURI: photo.uri})
-        //     });
+        fetch("https://eb073cce.ngrok.io/test", {
+            method: "POST",
+            body: data,
+          })
+          .then(function(response){
+            console.log('sample success')
+          })
+          .catch(function(error){
+              console.log('sample error')
+          })
+          
+        fetch("https://eb073cce.ngrok.io/predict", {
+            method: "POST",
+            body: data,
+          })
+            .then(response => {
+              console.log("upload succes", response);
+              alert("Upload success!");
+              navigate('ImageView', { imageURI: photo.uri })
+
+            })
+            .catch(error => {
+              console.log("upload error", error);
+              alert("Upload failed!");
+              navigate('ImageView',{ imageURI: photo.uri })
+            });
     };
 
     async componentDidMount() {
