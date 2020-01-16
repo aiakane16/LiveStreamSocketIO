@@ -49,24 +49,12 @@ export default class CameraView extends Component {
             name: 'sample',
             type: 'image/jpg'
         });
-
-        // fetch("http://192.168.254.102:8000/test", {
-        //     method: "POST",
-        //     body: data,
-        //   })
-        //   .then(function(response){
-        //     console.log('sample success')
-        //   })
-        //   .catch(function(error){
-        //       console.log('sample error')
-        //   })
           
-        fetch("http://192.168.254.102:8000/predict", {
+        fetch("https://8000-e30b46dc-4e8b-4cff-a247-c50875616ecd.ws-ap01.gitpod.io/predict", {
             method: "POST",
             body: data,
           })
             .then(response => {
-              console.log("upload succes", response);
               navigate('ImageView', { imageURI: photo.uri })
 
             })
