@@ -2,7 +2,7 @@ FROM gitpod/workspace-mysql
 
 USER root
 
-RUN add-apt-repository -r ppa:jonathonf/python-3.6 -Y
+RUN add-apt-repository -r -y ppa:jonathonf/python-3.6
 
 RUN apt-get update 
 
