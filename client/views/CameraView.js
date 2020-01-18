@@ -50,11 +50,12 @@ export default class CameraView extends Component {
             type: 'image/jpg'
         });
           
-        fetch("https://8000-e30b46dc-4e8b-4cff-a247-c50875616ecd.ws-ap01.gitpod.io/predict", {
+        fetch("https://8000-bf0f4027-70d6-4dd7-9d5b-da31948a60cd.ws-ap01.gitpod.io/predict", {
             method: "POST",
             body: data,
           })
             .then(response => {
+              console.log(response.body)
               navigate('ImageView', { imageURI: photo.uri })
 
             })

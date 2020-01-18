@@ -2,11 +2,9 @@ FROM gitpod/workspace-mysql
 
 USER root
 
-RUN add-apt-repository -r -y ppa:jonathonf/python-3.6
+RUN pyent install 3.6.10 \
+RUN pyenv global 2.7.17 3.6.10
 
-RUN apt-get -y update 
 
-RUN apt-get -y upgrade
 
-RUN apt-get install python3.6
 
