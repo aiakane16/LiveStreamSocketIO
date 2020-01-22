@@ -49,21 +49,23 @@ export default class CameraView extends Component {
             name: 'sample',
             type: 'image/jpg'
         });
-          
-        fetch("https://8000-bf0f4027-70d6-4dd7-9d5b-da31948a60cd.ws-ap01.gitpod.io/predict", {
+
+        fetch("http://2c4a69d1.ngrok.io/predict", {
             method: "POST",
             body: data,
-          })
-            .then(response => {
-              console.log(response.body)
-              navigate('ImageView', { imageURI: photo.uri })
-
-            })
-            .catch(error => {
-              console.log("upload error", error);
-              alert("Upload failed!");
-            //   navigate('ImageView',{ imageURI: photo.uri })
-            });
+        })
+        .then(response => response.blob())
+        .then(blob => new Promise((resolve, reject) => {
+            
+            const reader = new FileReader()
+            reader.onloadend = () => resolve(reader.result)
+            reader.onerror = reject
+            reader.readAsDataURL(blob)
+        }))
+        .then(dataURL => {
+            navigate('ImageView', { imageURI: dataURL })
+        })
+            
     };
 
     async componentDidMount() {

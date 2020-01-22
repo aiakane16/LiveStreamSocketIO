@@ -3,6 +3,7 @@ import { Text, View, TouchableOpacity } from 'react-native';
 import { Camera } from 'expo-camera';
 
 const App = function(){
+  
   const [hasPermission, setHasPermission] = useState(null);
   const [type, setType] = useState(Camera.Constants.Type.back);
 

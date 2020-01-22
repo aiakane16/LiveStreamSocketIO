@@ -9,6 +9,7 @@ export default class ProcessImageView extends Component {
 
     render(){
         var { imageURI } = this.props.navigation.state.params
+        
         return (
             <View>
                 <Image source={{ uri: imageURI}} style={styles.imageView} />
