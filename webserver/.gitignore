@@ -1,1 +1,3 @@
-__pycache__
+__pycache__/
+webserver/__pycache__/
+server/__pycache__/
