@@ -1,9 +1,0 @@
-django 
-djangorestframework 
-django-cors-headers 
-Cython 
-Pillow 
-opencv-python 
-scikit-image 
-scikit-learn 
-tensorflow==1.8.0
