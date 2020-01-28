@@ -2,7 +2,7 @@ import React from 'react';
 import { Camera } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { Col, Row, Grid } from "react-native-easy-grid";
-import { View, TouchableWithoutFeedback, TouchableOpacity } from 'react-native';
+import { View, TouchableWithoutFeedback, TouchableOpacity, Text } from 'react-native';
 
 import styles from '../styles';
 
@@ -13,9 +13,27 @@ export default ({
     cameraType = CameraTypes.back, 
     flashMode = CameraFlashModes.off, 
     setFlashMode, setCameraType, 
-    onCaptureIn, onCaptureOut, onLongCapture, onShortCapture,  
+    onCaptureIn, onCaptureOut, onLongCapture, onShortCapture, changeMode
 }) => (
     <Grid style={styles.bottomToolbar}>
+        <Row>
+            <Col>
+                <Text 
+                style={styles.modes}
+                onPress={()=> changeMode('image')}
+                >Image</Text>
+            </Col>
+             <Col>
+                <Text style={styles.modes}
+                 onPress={()=> changeMode('video')}
+                 >Video</Text>
+            </Col>
+             <Col>
+                <Text style={styles.modes}
+                 onPress={()=> changeMode('live')}
+                 >Live</Text>
+            </Col>
+        </Row>
         <Row>
             <Col style={styles.alignCenter}>
                 <TouchableOpacity onPress={() => setFlashMode( 

@@ -16,11 +16,17 @@ export default class CameraView extends Component {
         // start the back camera by default
         cameraType: Camera.Constants.Type.back,
         hasCameraPermission: null,
+        mode: 'image'
     };
 
     setFlashMode = (flashMode) => this.setState({ flashMode });
     setCameraType = (cameraType) => this.setState({ cameraType });
     handleCaptureIn = () => this.setState({ capturing: true });
+
+    changeMode = (mode) => {
+        this.state.mode = mode;
+        console.log(this.state.mode)
+    };
 
     handleCaptureOut = () => {
         if (this.state.capturing)
@@ -28,14 +34,21 @@ export default class CameraView extends Component {
     };
 
     handleShortCapture = async () => {
-        const photoData = await this.camera.takePictureAsync();
-        this.setState({ capturing: false, captures: [photoData, ...this.state.captures] })
+        var data;
+
+        if(this.state.mode === 'image'){
+            data = await this.camera.takePictureAsync();
+        }else if(this.state.mode === 'video'){
+            data = await this.camera.recordAsync();
+        }else{
+            data = await this.camera.takePictureAsync();
+        }
+        
+        this.setState({ capturing: false, captures: [data, ...this.state.captures] })
     };
 
     handleLongCapture = async () => {
-        const videoData = await this.camera.recordAsync();
-
-        this.setState({ capturing: false, captures: [videoData, ...this.state.captures] });
+        
     };
 
     handlePhotoUpload = (photo) => {
@@ -50,20 +63,20 @@ export default class CameraView extends Component {
             type: 'image/jpg'
         });
           
-        fetch("https://8000-bf0f4027-70d6-4dd7-9d5b-da31948a60cd.ws-ap01.gitpod.io/predict", {
+        fetch("https://8000-fca70a4b-ece3-4d87-a435-af1bcb4fc156.ws-ap01.gitpod.io/predict", {
             method: "POST",
             body: data,
           })
-            .then(response => {
-              console.log(response.body)
-              navigate('ImageView', { imageURI: photo.uri })
-
-            })
-            .catch(error => {
-              console.log("upload error", error);
-              alert("Upload failed!");
-            //   navigate('ImageView',{ imageURI: photo.uri })
-            });
+        .then(response => response.blob())
+        .then(blob => new Promise((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onloadend = () => resolve(reader.result)
+            reader.onerror = reject
+            reader.readAsDataURL(blob)
+        }))
+        .then(dataURL => {
+            navigate('ImageView', { imageURI: dataURL })
+        })
     };
 
     async componentDidMount() {
@@ -107,6 +120,7 @@ export default class CameraView extends Component {
                     onCaptureOut={this.handleCaptureOut}
                     onLongCapture={this.handleLongCapture}
                     onShortCapture={this.handleShortCapture}
+                    changeMode={this.changeMode}
                 />
             </Fragment>
             

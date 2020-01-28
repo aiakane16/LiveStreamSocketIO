@@ -59,5 +59,9 @@ export default StyleSheet.create({
     imageView: {
         height: winHeight,
         width: winWidth,
+    },
+    modes : {
+        textAlign: 'center',
+        color: '#FFFFFF'
     }
 });
