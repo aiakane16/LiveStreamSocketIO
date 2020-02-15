@@ -22,4 +22,7 @@ from . import views
 
 urlpatterns = [
     path('predict', csrf_exempt(views.Detector.as_view())),
+    path('test', csrf_exempt(views.Test.as_view())),
+    path('video', csrf_exempt(views.Video.as_view())),
+    path('frame', csrf_exempt(views.Frame.as_view()))
 ]
