@@ -20,6 +20,7 @@ import pandas as pd
 from django.http import FileResponse
 from wsgiref.util import FileWrapper
 from django.views.decorators import gzip
+import base64
 
 options = {"model": "cfg/tiny-yolo-voc.cfg", "load": "bin/tiny-yolo-voc.weights", "threshold": 0.1}
 tfnet = TFNet(options)
@@ -33,8 +34,21 @@ class Test(APIView):
         return Response("Nice")
         
 class Video(APIView):
+    def handle_uploaded_file(f):
+        with open('C:/Users/enrik.p.sabalvaro/Desktop/LiveStreamSocketIO/webserver/test.avi', 'wb+') as destination:
+            destination.write(f)
+                
+
+    def get(self, request):
+        file = open('out.avi', 'rb').read()
+        response = HttpResponse(file, content_type='video/avi')
+        response['Content-Disposition'] = 'attachment; filename=out.avi'
+        return response
+        
     def post(self, request):
-        cap = cv2.VideoCapture('sample_fb.mp4')
+        cap = request.FILES['video'].read()
+        Video.handle_uploaded_file(cap)
+        cap = cv2.VideoCapture("C:/Users/enrik.p.sabalvaro/Desktop/LiveStreamSocketIO/webserver/test.avi")
         frame_width = int(cap.get(3))
         frame_height = int(cap.get(4))
         frameRate = cap.get(5) #frame rate
@@ -70,32 +84,24 @@ class Video(APIView):
         cap.release()
         out.release()
         cv2.destroyAllWindows()
-        file = FileWrapper(open('out.avi', 'rb'))
+        file = open('C:/Users/enrik.p.sabalvaro/Desktop/LiveStreamSocketIO/webserver/out.avi', 'rb').read()
         response = HttpResponse(file, content_type='video/avi')
         response['Content-Disposition'] = 'attachment; filename=out.avi'
         return response
+        # file_name = 'out.avi'
+        # path_to_file = 'C:/Users/enrik.p.sabalvaro/Desktop/LiveStreamSocketIO/webserver/'
+        # response = HttpResponse(mimetype='application/force-download')
+        # response['Content-Disposition'] = 'attachment; filename=%s' % smart_str(file_name)
+        # response['X-Sendfile'] = smart_str(path_to_file)
+        # return response
         
 class Frame(APIView):
     @gzip.gzip_page
-    def get(self, request, stream_path="video"):
+    def get(self, request):
         try:
-            return StreamingHttpResponse(Frame.get_frame(), content_type="multipart/x-mixed-replace;boundary=frame")
-        except:
-            return "error"
-    
-  
-    def get_frame():
-        camera=cv2.VideoCapture(0)
-        
-        while True:
-            _, img = camera.read()
-            imgencode=cv2.imencode('.jpg', img)[1]
-            stringData=imgencode.toString()
-            yield(b'--frame\r\n'b'Content-Type: text/plain\r\n\r\n'+stringData+b'\r\n')
-        del(camera)
-       
-        
-            
+            return StreamingHttpResponse(VideoCamera.gen(VideoCamera()), content_type="multipart/x-mixed-replace;boundary=frame")
+        except:  # This is bad! replace it with proper handling
+            pass
 
 class Detector(APIView):
     def post(self, request):
@@ -173,3 +179,29 @@ class Detector(APIView):
                 cname = csv.loc[i,"color_name"]
         print(cname)
         return cname
+
+class VideoCamera(object):
+    def __init__(self):
+        self.video = cv2.VideoCapture(0)
+        (self.grabbed, self.frame) = self.video.read()
+        threading.Thread(target=self.update, args=()).start()
+
+    def __del__(self):
+        self.video.release()
+
+    def get_frame(self):
+        image = self.frame
+        ret, jpeg = cv2.imencode('.jpg', image)
+        return jpeg.tobytes()
+
+    def update(self):
+        while True:
+            (self.grabbed, self.frame) = self.video.read()
+
+    def gen(camera):
+        cam = VideoCamera()
+        while True:
+            frame = cam.get_frame()
+            yield(b'--frame\r\n'
+                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
+
