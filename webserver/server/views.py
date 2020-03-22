@@ -4,16 +4,10 @@ from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from PIL import Image
 import numpy as np
 import cv2
 import pickle
-from sklearn.neighbors import KNeighborsClassifier
-from skimage import io
 from darkflow.net.build import TFNet
-from sklearn.cluster import KMeans
-from collections import Counter
-from skimage.color import rgb2lab, deltaE_cie76
 import os
 from test_color import ColorNames as color
 import pandas as pd
@@ -21,6 +15,7 @@ from django.http import FileResponse
 from wsgiref.util import FileWrapper
 from django.views.decorators import gzip
 import base64
+import uuid
 
 options = {"model": "cfg/tiny-yolo-voc.cfg", "load": "bin/tiny-yolo-voc.weights", "threshold": 0.1}
 tfnet = TFNet(options)
@@ -107,8 +102,8 @@ class Detector(APIView):
     def post(self, request):
         #url = request.POST.get('image_url','')
         image_file = request.FILES['image'].read()
-        npimg = np.fromstring(image_file, np.uint8)
-        img = cv2.imdecode(npimg, cv2.COLOR_BGR2RGB)
+        img = cv2.imdecode(np.fromstring(image_file, np.uint8), cv2.IMREAD_UNCHANGED)
+        #img = cv2.imdecode(npimg, cv2.COLOR_BGR2RGB)
 
         if image_file:
             imgcv = img
@@ -129,10 +124,15 @@ class Detector(APIView):
                     #print(len(prediction))
                     
                     
-                    cv2.putText(imgcv, text, (x,y-20), font, 0.7, (0,0,0))
+                    cv2.putText(imgcv, text, (x,y-20), font, 5, (0,0,0))
+            # full_path = os.path.dirname(os.path.realpath(__file__))
+            # path = "D:/programming/Color Detection/LiveStreamSocketIO/webserver/server/static/"
+            # path_file = '/static/test.jpg'
+            # cv2.imwrite(r'D:\programming\Color Detection\LiveStreamSocketIO\webserver\server\static\test.jpg', imgcv)
+            # return HttpResponse(path_file)
             data = cv2.imencode('.jpg', imgcv)[1].tobytes()
             return HttpResponse(data, content_type="image/jpg")
-            #return HttpResponse(type(data), content_type="application/json")
+            return HttpResponse(path_file, content_type="application/json")
         else:
             return Response("No image")
 
