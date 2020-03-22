@@ -122,7 +122,7 @@ class Detector(APIView):
                     
                     new_img = imgcv[y:h, x:w]
                     text = Detector.convert_image(new_img)
-                    cv2.rectangle(imgcv, (x,y), (w,h), (255, 0, 0), 2)
+                    cv2.rectangle(imgcv, (x,y), (w,h), (255, 0, 0), 10)
                     #print(len(prediction))
                     
                     
