@@ -104,11 +104,13 @@ class Detector(APIView):
         image_file = request.FILES['image'].read()
         img = cv2.imdecode(np.fromstring(image_file, np.uint8), cv2.IMREAD_UNCHANGED)
         #img = cv2.imdecode(npimg, cv2.COLOR_BGR2RGB)
+        h, w, _ = img.shape
+        thick = int((h + w) // 300)
 
         if image_file:
             imgcv = img
             results = tfnet.return_predict(imgcv)
-            font = cv2.FONT_HERSHEY_SIMPLEX #Creates a font
+            font = cv2.FONT_HERSHEY_TRIPLEX #Creates a font
 
             for result in results:
             
@@ -124,7 +126,7 @@ class Detector(APIView):
                     #print(len(prediction))
                     
                     
-                    cv2.putText(imgcv, text, (x,y-20), font, 5, (0,0,0))
+                    cv2.putText(imgcv, text, (x,y-12), 0, 1e-3 * h + 5, (0,0,0), 25)
             # full_path = os.path.dirname(os.path.realpath(__file__))
             # path = "D:/programming/Color Detection/LiveStreamSocketIO/webserver/server/static/"
             # path_file = '/static/test.jpg'
