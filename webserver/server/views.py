@@ -16,6 +16,7 @@ from wsgiref.util import FileWrapper
 from django.views.decorators import gzip
 import base64
 import uuid
+import os
 
 options = {"model": "cfg/tiny-yolo-voc.cfg", "load": "bin/tiny-yolo-voc.weights", "threshold": 0.1}
 tfnet = TFNet(options)
@@ -30,25 +31,27 @@ class Test(APIView):
         
 class Video(APIView):
     def handle_uploaded_file(f):
-        with open('C:/Users/enrik.p.sabalvaro/Desktop/LiveStreamSocketIO/webserver/test.avi', 'wb+') as destination:
+        currentDirectory = os.getcwd()
+        with open(os.path.join(currentDirectory, 'test.mp4'), 'wb+') as destination:
             destination.write(f)
                 
 
     def get(self, request):
-        file = open('out.avi', 'rb').read()
-        response = HttpResponse(file, content_type='video/avi')
-        response['Content-Disposition'] = 'attachment; filename=out.avi'
+        file = open('out.mp4', 'rb').read()
+        response = HttpResponse(file, content_type='video/mp4')
+        response['Content-Disposition'] = 'attachment; filename=out.mp4'
         return response
         
     def post(self, request):
+        currentDirectory = os.getcwd()
         cap = request.FILES['video'].read()
         Video.handle_uploaded_file(cap)
-        cap = cv2.VideoCapture("C:/Users/enrik.p.sabalvaro/Desktop/LiveStreamSocketIO/webserver/test.avi")
+        cap = cv2.VideoCapture(os.path.join(currentDirectory, 'test.mp4'))
         frame_width = int(cap.get(3))
         frame_height = int(cap.get(4))
         frameRate = cap.get(5) #frame rate
         
-        out = cv2.VideoWriter('out.avi',cv2.VideoWriter_fourcc(*'MJPG'), 30, (frame_width,frame_height), 1)
+        out = cv2.VideoWriter('out.mp4',cv2.VideoWriter_fourcc(*'MP4V'), 30, (frame_width,frame_height), 1)
         font = cv2.FONT_HERSHEY_SIMPLEX #Creates a font
         
         count = 0
@@ -79,9 +82,9 @@ class Video(APIView):
         cap.release()
         out.release()
         cv2.destroyAllWindows()
-        file = open('C:/Users/enrik.p.sabalvaro/Desktop/LiveStreamSocketIO/webserver/out.avi', 'rb').read()
-        response = HttpResponse(file, content_type='video/avi')
-        response['Content-Disposition'] = 'attachment; filename=out.avi'
+        file = open(os.path.join(currentDirectory, 'out.mp4'), 'rb').read()
+        response = HttpResponse(file, content_type='video/mp4')
+        response['Content-Disposition'] = 'attachment; filename=out.mp4'
         return response
         # file_name = 'out.avi'
         # path_to_file = 'C:/Users/enrik.p.sabalvaro/Desktop/LiveStreamSocketIO/webserver/'
