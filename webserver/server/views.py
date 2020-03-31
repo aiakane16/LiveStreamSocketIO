@@ -17,6 +17,8 @@ from django.views.decorators import gzip
 import base64
 import uuid
 import os
+from sklearn.cluster import KMeans
+
 
 options = {"model": "cfg/tiny-yolo-voc.cfg", "load": "bin/tiny-yolo-voc.weights", "threshold": 0.1}
 tfnet = TFNet(options)
@@ -24,21 +26,7 @@ tfnet = TFNet(options)
 index=["color","color_name","hex","R","G","B"]
 csv = pd.read_csv('colors.csv', names=index, header=None)
 
-class Test(APIView):
-    # def post(self, request):
-    #     #url = request.POST.get('image_url','')
-    #     image_file = request.FILES['image'].read()
-    #     img = cv2.imdecode(np.fromstring(image_file, np.uint8), cv2.IMREAD_UNCHANGED)
-    #     #img = cv2.imdecode(npimg, cv2.COLOR_BGR2RGB)
-    #     h, w, _ = img.shape
-    #     thick = int((h + w) // 300)
-
-    #     if image_file:
-    #         imgcv = img
-    #         results = tfnet.return_predict(imgcv)
-    #         return Response(results)
-    #     else:
-    #         return Response("No image")
+class JSONImage(APIView):
     def post(self, request):
         #url = request.POST.get('image_url','')
         image_file = request.FILES['image'].read()
@@ -52,18 +40,22 @@ class Test(APIView):
             results = tfnet.return_predict(imgcv)
             font = cv2.FONT_HERSHEY_TRIPLEX #Creates a font
             data_res = []
+            text = "no color"
 
             for result in results:
             
-                if result["confidence"] > 0.3:
+                if result["confidence"]:
                     x = result["topleft"]["x"]
                     y = result["topleft"]["y"]
                     w = result["bottomright"]["x"]
                     h = result["bottomright"]["y"]
                     
                     new_img = imgcv[y:h, x:w]
-                    text = Test.convert_image(new_img)
-                    result['color'] = text
+                    color = JSONImage.dominantColors(new_img, 3)
+                    result['colors'] = []
+                    result['colors'].append(JSONImage.getColorName(int(color[0][0]), int(color[0][1]), int(color[0][2])))
+                    result['colors'].append(JSONImage.getColorName(int(color[1][0]), int(color[1][1]), int(color[1][2])))
+                    result['colors'].append(JSONImage.getColorName(int(color[2][0]), int(color[2][1]), int(color[2][2])))
 
             return Response(results)
                     
@@ -102,7 +94,7 @@ class Test(APIView):
         print(feature_data[1])
         print(feature_data[2])
         
-        return Test.getColorName(int(feature_data[0]), int(feature_data[1]), int(feature_data[2]))
+        return JSONImage.getColorName(int(feature_data[0]), int(feature_data[1]), int(feature_data[2]))
     
     #function to calculate minimum distance from all colors and get the most matching color
     def getColorName(R,G,B):
@@ -114,7 +106,82 @@ class Test(APIView):
                 cname = csv.loc[i,"color_name"]
         print(cname)
         return cname
+
+    def dominantColors(img, clusters):
+    
+        #read image
+        #img = cv2.imread("D:/programming/darkflow/sample_computer.jpg")
         
+        #convert to rgb from bgr
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                
+        #reshaping to a list of pixels
+        img = img.reshape((img.shape[0] * img.shape[1], 3))
+        
+        #save image after operations
+        IMAGE = img
+        
+        #using k-means to cluster pixels
+        kmeans = KMeans(n_clusters = clusters)
+        kmeans.fit(img)
+        
+        #the cluster centers are our dominant colors.
+        COLORS = kmeans.cluster_centers_
+        
+        #save labels
+        LABELS = kmeans.labels_
+        
+        #returning after converting to integer from float
+        color = COLORS.astype(int)
+
+        return color
+
+class JSONVideo(APIView):
+    def handle_uploaded_file(f):
+        currentDirectory = os.getcwd()
+        with open(os.path.join(currentDirectory, 'test.mp4'), 'wb+') as destination:
+            destination.write(f)
+        
+    def post(self, request):
+        currentDirectory = os.getcwd()
+        cap = request.FILES['video'].read()
+        Video.handle_uploaded_file(cap)
+        cap = cv2.VideoCapture(os.path.join(currentDirectory, 'test.mp4'))
+        frame_width = int(cap.get(3))
+        frame_height = int(cap.get(4))
+        frameRate = cap.get(5) #frame rate
+        
+        out = cv2.VideoWriter('out.mp4',cv2.VideoWriter_fourcc(*'MP4V'), 30, (frame_width,frame_height), 1)
+        font = cv2.FONT_HERSHEY_SIMPLEX #Creates a font
+        
+        count = 0
+        datas = []
+        while(cap.isOpened()):
+            frameId = cap.get(1) #current frame number
+            ret, frame = cap.read()
+            print(count)
+            if ret==True:
+                # write the flipped frame
+                results = tfnet.return_predict(frame)
+                for result in results:
+                    if result["confidence"]:
+                        x = result["topleft"]["x"]
+                        y = result["topleft"]["y"]
+                        w = result["bottomright"]["x"]
+                        h = result["bottomright"]["y"]
+                        new_img = cv2.cvtColor(frame[y:h, x:w], cv2.COLOR_RGB2BGR)     
+                        color = JSONImage.dominantColors(new_img, 3)
+                        result['colors'] = []
+                        result['colors'].append(JSONImage.getColorName(int(color[0][0]), int(color[0][1]), int(color[0][2])))
+                        result['colors'].append(JSONImage.getColorName(int(color[1][0]), int(color[1][1]), int(color[1][2])))
+                        result['colors'].append(JSONImage.getColorName(int(color[2][0]), int(color[2][1]), int(color[2][2])))
+                datas.append(results)
+            else:
+                break
+                
+        return Response(datas)
+        
+
 class Video(APIView):
     def handle_uploaded_file(f):
         currentDirectory = os.getcwd()
@@ -192,7 +259,7 @@ class Detector(APIView):
         #url = request.POST.get('image_url','')
         image_file = request.FILES['image'].read()
         img = cv2.imdecode(np.fromstring(image_file, np.uint8), cv2.IMREAD_UNCHANGED)
-        #img = cv2.imdecode(npimg, cv2.COLOR_BGR2RGB)
+        #img = cv2.imdecode(image_file, cv2.COLOR_BGR2RGB)
         h, w, _ = img.shape
         thick = int((h + w) // 300)
 
@@ -203,7 +270,7 @@ class Detector(APIView):
 
             for result in results:
             
-                if result["confidence"] > 0.3:
+                if result["confidence"]:
                     x = result["topleft"]["x"]
                     y = result["topleft"]["y"]
                     w = result["bottomright"]["x"]
