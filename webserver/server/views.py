@@ -26,8 +26,19 @@ csv = pd.read_csv('colors.csv', names=index, header=None)
 
 class Test(APIView):
     def post(self, request):
-    
-        return Response("Nice")
+        #url = request.POST.get('image_url','')
+        image_file = request.FILES['image'].read()
+        img = cv2.imdecode(np.fromstring(image_file, np.uint8), cv2.IMREAD_UNCHANGED)
+        #img = cv2.imdecode(npimg, cv2.COLOR_BGR2RGB)
+        h, w, _ = img.shape
+        thick = int((h + w) // 300)
+
+        if image_file:
+            imgcv = img
+            results = tfnet.return_predict(imgcv)
+            return Response(results)
+        else:
+            return Response("No image")
         
 class Video(APIView):
     def handle_uploaded_file(f):
