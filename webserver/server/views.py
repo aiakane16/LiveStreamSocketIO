@@ -25,6 +25,20 @@ index=["color","color_name","hex","R","G","B"]
 csv = pd.read_csv('colors.csv', names=index, header=None)
 
 class Test(APIView):
+    # def post(self, request):
+    #     #url = request.POST.get('image_url','')
+    #     image_file = request.FILES['image'].read()
+    #     img = cv2.imdecode(np.fromstring(image_file, np.uint8), cv2.IMREAD_UNCHANGED)
+    #     #img = cv2.imdecode(npimg, cv2.COLOR_BGR2RGB)
+    #     h, w, _ = img.shape
+    #     thick = int((h + w) // 300)
+
+    #     if image_file:
+    #         imgcv = img
+    #         results = tfnet.return_predict(imgcv)
+    #         return Response(results)
+    #     else:
+    #         return Response("No image")
     def post(self, request):
         #url = request.POST.get('image_url','')
         image_file = request.FILES['image'].read()
@@ -36,9 +50,70 @@ class Test(APIView):
         if image_file:
             imgcv = img
             results = tfnet.return_predict(imgcv)
+            font = cv2.FONT_HERSHEY_TRIPLEX #Creates a font
+            data_res = []
+
+            for result in results:
+            
+                if result["confidence"] > 0.3:
+                    x = result["topleft"]["x"]
+                    y = result["topleft"]["y"]
+                    w = result["bottomright"]["x"]
+                    h = result["bottomright"]["y"]
+                    
+                    new_img = imgcv[y:h, x:w]
+                    text = Test.convert_image(new_img)
+                    result['color'] = text
+
             return Response(results)
+                    
+
         else:
             return Response("No image")
+
+    def convert_image(src_image):
+        # load the image
+        image = src_image
+
+        chans = cv2.split(image)
+        colors = ('b', 'g', 'r')
+        features = []
+        feature_data = ''
+        counter = 0
+        for (chan, color) in zip(chans, colors):
+            counter = counter + 1
+
+            hist = cv2.calcHist([chan], [0], None, [256], [0, 256])
+            features.extend(hist)
+
+            # find the peak pixel values for R, G, and B
+            elem = np.argmax(hist)
+
+            if counter == 1:
+                blue = str(elem)
+            elif counter == 2:
+                green = str(elem)
+            elif counter == 3:
+                red = str(elem)
+                feature_data = [red, green, blue]
+                print("feature", feature_data)
+
+        print(feature_data[0])
+        print(feature_data[1])
+        print(feature_data[2])
+        
+        return Test.getColorName(int(feature_data[0]), int(feature_data[1]), int(feature_data[2]))
+    
+    #function to calculate minimum distance from all colors and get the most matching color
+    def getColorName(R,G,B):
+        minimum = 10000
+        for i in range(len(csv)):
+            d = abs(R- int(csv.loc[i,"R"])) + abs(G- int(csv.loc[i,"G"]))+ abs(B- int(csv.loc[i,"B"]))
+            if(d<=minimum):
+                minimum = d
+                cname = csv.loc[i,"color_name"]
+        print(cname)
+        return cname
         
 class Video(APIView):
     def handle_uploaded_file(f):
