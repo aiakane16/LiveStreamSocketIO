@@ -26,6 +26,46 @@ tfnet = TFNet(options)
 index=["color","color_name","hex","R","G","B"]
 csv = pd.read_csv('colors.csv', names=index, header=None)
 
+def get_frame():
+    camera = cv2.VideoCapture(0)
+    font = cv2.FONT_HERSHEY_TRIPLEX #Creates a font
+    
+    while True:
+        _, frame = camera.read()
+        
+        
+        results = tfnet.return_predict(frame)
+        for result in results:
+            if result["confidence"]:
+                x = result["topleft"]["x"]
+                y = result["topleft"]["y"]
+                w = result["bottomright"]["x"]
+                h = result["bottomright"]["y"]
+                cv2.rectangle(frame, (x,y), (w,h), (255, 0, 0), 2) 
+                new_img = cv2.cvtColor(frame[y:h, x:w], cv2.COLOR_RGB2BGR)     
+                text = Detector.convert_image(new_img)
+                cv2.putText(frame, text, (x,y-20), font, 0.7, (0,0,0))
+        
+        imgencode=cv2.imencode('.jpg',frame)[1]
+
+        stringData=imgencode.tostring() 
+        yield(b'--frame\r\n'b'Content-Type: text/plain\r\n\r\n'+stringData+b'\r\n')
+    del(camera)
+
+def indexScreen(request):
+    try:
+        template = "screen.html"
+        return render(request, "screen.html")
+    except HttpResponseServerError:
+        print("error")
+
+@gzip.gzip_page
+def dynamic_stream(request,stream_path='video'):
+    try :
+        return StreamingHttpResponse(get_frame(), content_type='multipart/x-mixed-replace;boundary=frame')
+    except:
+        return "error"
+
 class JSONImage(APIView):
     def post(self, request):
         #url = request.POST.get('image_url','')
@@ -182,6 +222,12 @@ class Video(APIView):
         currentDirectory = os.getcwd()
         with open(os.path.join(currentDirectory, 'test.mp4'), 'wb+') as destination:
             destination.write(f)
+
+    def checkIfMobile(width, height):
+        if width > 640 and height > 480:
+            return False
+        else:
+            return True
                 
 
     def get(self, request):
@@ -201,6 +247,16 @@ class Video(APIView):
         
         out = cv2.VideoWriter('out.mp4',cv2.VideoWriter_fourcc(*'MP4V'), 30, (frame_width,frame_height), 1)
         font = cv2.FONT_HERSHEY_SIMPLEX #Creates a font
+
+        mobile = Video.checkIfMobile(frame_width, frame_height)
+
+        thin = 2
+        font_size = 0.7
+
+        if not mobile:
+            thin = 8
+            font_size = 3
+
         
         count = 0
         while(cap.isOpened()):
@@ -216,16 +272,20 @@ class Video(APIView):
                         y = result["topleft"]["y"]
                         w = result["bottomright"]["x"]
                         h = result["bottomright"]["y"]
-                        cv2.rectangle(frame, (x,y), (w,h), (255, 0, 0), 2) 
+                        cv2.rectangle(frame, (x,y), (w,h), (255, 0, 0), thin) 
                         new_img = cv2.cvtColor(frame[y:h, x:w], cv2.COLOR_RGB2BGR)     
                         text = Detector.convert_image(new_img)
-                        cv2.putText(frame, text, (x,y-20), font, 0.7, (0,0,0))
+                        cv2.putText(frame, text, (x,y-20), font, font_size, (0,0,0))
                            
                 out.write(frame)
                 
                 count += 1
             else:
                 break
+
+        print("***********RESOLUTION**************")
+        print(frame_width)
+        print(frame_height)
                 
         cap.release()
         out.release()
@@ -332,45 +392,6 @@ class Detector(APIView):
         print(cname)
         return cname
 
-def get_frame():
-    camera = cv2.VideoCapture(0)
-    font = cv2.FONT_HERSHEY_TRIPLEX #Creates a font
-    
-    while True:
-        _, frame = camera.read()
-        
-        
-        results = tfnet.return_predict(frame)
-        for result in results:
-            if result["confidence"]:
-                x = result["topleft"]["x"]
-                y = result["topleft"]["y"]
-                w = result["bottomright"]["x"]
-                h = result["bottomright"]["y"]
-                cv2.rectangle(frame, (x,y), (w,h), (255, 0, 0), 2) 
-                new_img = cv2.cvtColor(frame[y:h, x:w], cv2.COLOR_RGB2BGR)     
-                text = Detector.convert_image(new_img)
-                cv2.putText(frame, text, (x,y-20), font, 0.7, (0,0,0))
-        
-        imgencode=cv2.imencode('.jpg',frame)[1]
-
-        stringData=imgencode.tostring() 
-        yield(b'--frame\r\n'b'Content-Type: text/plain\r\n\r\n'+stringData+b'\r\n')
-    del(camera)
-
-def indexScreen(request):
-    try:
-        template = "screen.html"
-        return render(request, "screen.html")
-    except HttpResponseServerError:
-        print("error")
-
-@gzip.gzip_page
-def dynamic_stream(request,stream_path='video'):
-    try :
-        return StreamingHttpResponse(get_frame(), content_type='multipart/x-mixed-replace;boundary=frame')
-    except:
-        return "error"
 
 class VideoCamera(object):
     def __init__(self):
