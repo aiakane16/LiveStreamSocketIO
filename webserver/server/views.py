@@ -215,7 +215,7 @@ class Video(APIView):
                 # write the flipped frame
                 results = tfnet.return_predict(frame)
                 for result in results:
-                    if result["confidence"] > 0.3:
+                    if result["confidence"]:
                         x = result["topleft"]["x"]
                         y = result["topleft"]["y"]
                         w = result["bottomright"]["x"]
