@@ -39,8 +39,6 @@ class JSONImage(APIView):
             imgcv = img
             results = tfnet.return_predict(imgcv)
             font = cv2.FONT_HERSHEY_TRIPLEX #Creates a font
-            data_res = []
-            text = "no color"
 
             for result in results:
             
@@ -51,11 +49,9 @@ class JSONImage(APIView):
                     h = result["bottomright"]["y"]
                     
                     new_img = imgcv[y:h, x:w]
-                    color = JSONImage.dominantColors(new_img, 3)
-                    result['colors'] = []
-                    result['colors'].append(JSONImage.getColorName(int(color[0][0]), int(color[0][1]), int(color[0][2])))
-                    result['colors'].append(JSONImage.getColorName(int(color[1][0]), int(color[1][1]), int(color[1][2])))
-                    result['colors'].append(JSONImage.getColorName(int(color[2][0]), int(color[2][1]), int(color[2][2])))
+                    text = Detector.convert_image(new_img)
+                    result['color'] = text     
+                        
 
             return Response(results)
                     
