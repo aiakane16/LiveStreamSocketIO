@@ -25,5 +25,7 @@ urlpatterns = [
     path('imgpredict', csrf_exempt(views.JSONImage.as_view())),
     path('vidpredict', csrf_exempt(views.JSONVideo.as_view())),
     path('video', csrf_exempt(views.Video.as_view())),
-    path('frame', csrf_exempt(views.Frame.as_view()))
+    path('frame', csrf_exempt(views.Frame.as_view())),
+    path('/(?P<stream_path>(.*?))/',views.dynamic_stream,name="videostream"),  
+    path('stream/',views.indexScreen),
 ]

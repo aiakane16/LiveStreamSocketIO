@@ -20,7 +20,7 @@ import os
 from sklearn.cluster import KMeans
 
 
-options = {"model": "cfg/tiny-yolo-voc.cfg", "load": "bin/tiny-yolo-voc.weights", "threshold": 0.1}
+options = {"model": "cfg/tiny-yolo-voc.cfg", "load": "bin/tiny-yolo-voc.weights", "threshold": 0.1  }
 tfnet = TFNet(options)
 
 index=["color","color_name","hex","R","G","B"]
@@ -256,7 +256,6 @@ class Detector(APIView):
         img = cv2.imdecode(np.fromstring(image_file, np.uint8), cv2.IMREAD_UNCHANGED)
         #img = cv2.imdecode(image_file, cv2.COLOR_BGR2RGB)
         h, w, _ = img.shape
-        thick = int((h + w) // 300)
 
         if image_file:
             imgcv = img
@@ -333,6 +332,46 @@ class Detector(APIView):
         print(cname)
         return cname
 
+def get_frame():
+    camera = cv2.VideoCapture(0)
+    font = cv2.FONT_HERSHEY_TRIPLEX #Creates a font
+    
+    while True:
+        _, frame = camera.read()
+        
+        
+        results = tfnet.return_predict(frame)
+        for result in results:
+            if result["confidence"]:
+                x = result["topleft"]["x"]
+                y = result["topleft"]["y"]
+                w = result["bottomright"]["x"]
+                h = result["bottomright"]["y"]
+                cv2.rectangle(frame, (x,y), (w,h), (255, 0, 0), 2) 
+                new_img = cv2.cvtColor(frame[y:h, x:w], cv2.COLOR_RGB2BGR)     
+                text = Detector.convert_image(new_img)
+                cv2.putText(frame, text, (x,y-20), font, 0.7, (0,0,0))
+        
+        imgencode=cv2.imencode('.jpg',frame)[1]
+
+        stringData=imgencode.tostring() 
+        yield(b'--frame\r\n'b'Content-Type: text/plain\r\n\r\n'+stringData+b'\r\n')
+    del(camera)
+
+def indexScreen(request):
+    try:
+        template = "screen.html"
+        return render(request, "screen.html")
+    except HttpResponseServerError:
+        print("error")
+
+@gzip.gzip_page
+def dynamic_stream(request,stream_path='video'):
+    try :
+        return StreamingHttpResponse(get_frame(), content_type='multipart/x-mixed-replace;boundary=frame')
+    except:
+        return "error"
+
 class VideoCamera(object):
     def __init__(self):
         self.video = cv2.VideoCapture(0)
@@ -357,4 +396,5 @@ class VideoCamera(object):
             frame = cam.get_frame()
             yield(b'--frame\r\n'
                 b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
+    
 
