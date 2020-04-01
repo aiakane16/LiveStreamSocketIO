@@ -170,11 +170,10 @@ class JSONVideo(APIView):
                         w = result["bottomright"]["x"]
                         h = result["bottomright"]["y"]
                         new_img = cv2.cvtColor(frame[y:h, x:w], cv2.COLOR_RGB2BGR)     
-                        color = JSONImage.dominantColors(new_img, 3)
-                        result['colors'] = []
-                        result['colors'].append(JSONImage.getColorName(int(color[0][0]), int(color[0][1]), int(color[0][2])))
-                        result['colors'].append(JSONImage.getColorName(int(color[1][0]), int(color[1][1]), int(color[1][2])))
-                        result['colors'].append(JSONImage.getColorName(int(color[2][0]), int(color[2][1]), int(color[2][2])))
+                        text = Detector.convert_image(new_img)
+                        result['color'] = text
+                    
+                count += 1
                 datas.append(results)
             else:
                 break
