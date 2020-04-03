@@ -81,7 +81,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         print("this is the message *****************")
         #print(message)
 
-        #out = cv2.VideoWriter('out.mp4',cv2.VideoWriter_fourcc(*'MP4V'), 30, (frame_width,frame_height), 1)
+        out = cv2.VideoWriter('out.mp4',cv2.VideoWriter_fourcc(*'MP4V'), 30, (1280,720), 1)
         img = imread(io.BytesIO(base64.b64decode(message)))
         imgcv = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         results = tfnet.return_predict(imgcv)
@@ -99,9 +99,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 text = ChatConsumer.convert_image(new_img)
                 cv2.rectangle(imgcv, (x,y), (w,h), (255, 0, 0), 10)
                 cv2.putText(imgcv, text, (x,y-20), font, 0.7, (0,0,0))
-            
+
+
+            out.write(imgcv)
+
             data = cv2.imencode('.jpg', imgcv)[1].tobytes()
-        
             b64_bytes = base64.b64encode(data)
             b64_string = b64_bytes.decode()
       
