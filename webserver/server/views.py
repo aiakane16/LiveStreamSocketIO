@@ -19,12 +19,19 @@ import uuid
 import os
 from sklearn.cluster import KMeans
 
-
 options = {"model": "cfg/tiny-yolo-voc.cfg", "load": "bin/tiny-yolo-voc.weights", "threshold": 0.1  }
 tfnet = TFNet(options)
 
 index=["color","color_name","hex","R","G","B"]
 csv = pd.read_csv('colors.csv', names=index, header=None)
+
+def index(request):
+    return render(request, 'chat/index.html', {})
+
+def room(request, room_name):
+    return render(request, 'chat/room.html', {
+        'room_name': room_name
+    })
 
 def get_frame():
     camera = cv2.VideoCapture(0)
@@ -124,11 +131,11 @@ class JSONImage(APIView):
             elif counter == 3:
                 red = str(elem)
                 feature_data = [red, green, blue]
-                print("feature", feature_data)
+                #print("feature", feature_data)
 
-        print(feature_data[0])
-        print(feature_data[1])
-        print(feature_data[2])
+        #print(feature_data[0])
+        #print(feature_data[1])
+        #print(feature_data[2])
         
         return JSONImage.getColorName(int(feature_data[0]), int(feature_data[1]), int(feature_data[2]))
     
@@ -140,7 +147,7 @@ class JSONImage(APIView):
             if(d<=minimum):
                 minimum = d
                 cname = csv.loc[i,"color_name"]
-        print(cname)
+        #print(cname)
         return cname
 
     def dominantColors(img, clusters):
@@ -262,7 +269,7 @@ class Video(APIView):
         while(cap.isOpened()):
             frameId = cap.get(1) #current frame number
             ret, frame = cap.read()
-            print(count)
+            #print(count)
             if ret==True:
                 # write the flipped frame
                 results = tfnet.return_predict(frame)
@@ -276,7 +283,7 @@ class Video(APIView):
                         new_img = cv2.cvtColor(frame[y:h, x:w], cv2.COLOR_RGB2BGR)     
                         text = Detector.convert_image(new_img)
                         cv2.putText(frame, text, (x,y-20), font, font_size, (0,0,0))
-                           
+                print(frame)     
                 out.write(frame)
                 
                 count += 1
@@ -373,11 +380,11 @@ class Detector(APIView):
             elif counter == 3:
                 red = str(elem)
                 feature_data = [red, green, blue]
-                print("feature", feature_data)
+                #print("feature", feature_data)
 
-        print(feature_data[0])
-        print(feature_data[1])
-        print(feature_data[2])
+        #print(feature_data[0])
+        #print(feature_data[1])
+        #print(feature_data[2])
         
         return Detector.getColorName(int(feature_data[0]), int(feature_data[1]), int(feature_data[2]))
     
@@ -389,7 +396,7 @@ class Detector(APIView):
             if(d<=minimum):
                 minimum = d
                 cname = csv.loc[i,"color_name"]
-        print(cname)
+        #print(cname)
         return cname
 
 
@@ -417,5 +424,7 @@ class VideoCamera(object):
             frame = cam.get_frame()
             yield(b'--frame\r\n'
                 b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
+
+
     
 
