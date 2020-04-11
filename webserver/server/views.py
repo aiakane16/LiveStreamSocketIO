@@ -19,11 +19,25 @@ import uuid
 import os
 from sklearn.cluster import KMeans
 
-options = {"model": "cfg/tiny-yolo-voc.cfg", "load": "bin/tiny-yolo-voc.weights", "threshold": 0.1  }
+options = {"model": "cfg/tiny-yolo-voc.cfg", "load": "bin/tiny-yolo-voc.weights", "threshold": 0.1}
 tfnet = TFNet(options)
 
 index=["color","color_name","hex","R","G","B"]
 csv = pd.read_csv('colors.csv', names=index, header=None)
+
+def local(request):
+    return render(request, 'local.html')
+
+def write(request):
+    b64_bytes = open("stream.txt","r").read()
+
+    fh = open("stream.mp4", "wb")
+    fh.write(base64.b64decode(b64_bytes))
+    fh.close()
+
+    open("stream.txt", "w").close()
+
+    return Response("go to /video for download")
 
 def index(request):
     return render(request, 'chat/index.html', {})
@@ -54,9 +68,9 @@ def get_frame():
                 cv2.putText(frame, text, (x,y-20), font, 0.7, (0,0,0))
         
         imgencode=cv2.imencode('.jpg',frame)[1]
-
-        stringData=imgencode.tostring() 
+        stringData = imgencode.tostring()
         yield(b'--frame\r\n'b'Content-Type: text/plain\r\n\r\n'+stringData+b'\r\n')
+         
     del(camera)
 
 def indexScreen(request):
@@ -72,6 +86,7 @@ def dynamic_stream(request,stream_path='video'):
         return StreamingHttpResponse(get_frame(), content_type='multipart/x-mixed-replace;boundary=frame')
     except:
         return "error"
+
 
 class JSONImage(APIView):
     def post(self, request):
@@ -247,6 +262,13 @@ class Video(APIView):
         currentDirectory = os.getcwd()
         cap = request.FILES['video'].read()
         Video.handle_uploaded_file(cap)
+        # with open("test.mp4", "rb") as videoFile:
+        #     text = base64.b64encode(videoFile.read())
+        #     file = open("stream.txt", "wb") 
+        #     file.write(text)
+        #     file.close()
+
+
         cap = cv2.VideoCapture(os.path.join(currentDirectory, 'test.mp4'))
         frame_width = int(cap.get(3))
         frame_height = int(cap.get(4))
@@ -271,7 +293,6 @@ class Video(APIView):
             ret, frame = cap.read()
             #print(count)
             if ret==True:
-                # write the flipped frame
                 results = tfnet.return_predict(frame)
                 for result in results:
                     if result["confidence"]:
@@ -283,7 +304,7 @@ class Video(APIView):
                         new_img = cv2.cvtColor(frame[y:h, x:w], cv2.COLOR_RGB2BGR)     
                         text = Detector.convert_image(new_img)
                         cv2.putText(frame, text, (x,y-20), font, font_size, (0,0,0))
-                print(frame)     
+                print(count)     
                 out.write(frame)
                 
                 count += 1

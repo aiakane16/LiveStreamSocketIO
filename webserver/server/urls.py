@@ -29,4 +29,6 @@ urlpatterns = [
     path('frame', csrf_exempt(views.Frame.as_view())),
     path('/(?P<stream_path>(.*?))/',views.dynamic_stream,name="videostream"),  
     path('stream/',views.indexScreen),
+    path('write/',views.write),
+    path('local',views.local)
 ]
