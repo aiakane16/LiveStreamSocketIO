@@ -1,77 +1,451 @@
 from django.shortcuts import render 
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, StreamingHttpResponse, HttpResponseServerError
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from PIL import Image
 import numpy as np
 import cv2
 import pickle
-from sklearn.neighbors import KNeighborsClassifier
-from skimage import io
 from darkflow.net.build import TFNet
-from sklearn.cluster import KMeans
-from collections import Counter
-from skimage.color import rgb2lab, deltaE_cie76
 import os
 from test_color import ColorNames as color
+import pandas as pd
+from django.http import FileResponse
+from wsgiref.util import FileWrapper
+from django.views.decorators import gzip
+import base64
+import uuid
+import os
+from sklearn.cluster import KMeans
+
 options = {"model": "cfg/tiny-yolo-voc.cfg", "load": "bin/tiny-yolo-voc.weights", "threshold": 0.1}
 tfnet = TFNet(options)
 
-class Detector(APIView):
+index=["color","color_name","hex","R","G","B"]
+csv = pd.read_csv('colors.csv', names=index, header=None)
 
-    def post(self, request):
-        #url = request.POST.get('image_url','')
-        print(request)
-        image_file = request.FILES.get('image', False)
+def local(request):
+    return render(request, 'local.html')
 
-        if image_file:
-            imgcv = cv2.cvtColor(np.array(io.imread(image_file)), cv2.COLOR_RGB2BGR)
-            results = tfnet.return_predict(imgcv)
-            font = cv2.FONT_HERSHEY_SIMPLEX #Creates a font
+def write(request):
+    b64_bytes = open("stream.txt","r").read()
 
-            for result in results:
+    fh = open("stream.mp4", "wb")
+    fh.write(base64.b64decode(b64_bytes))
+    fh.close()
+
+    open("stream.txt", "w").close()
+
+    return Response("go to /video for download")
+
+def index(request):
+    return render(request, 'chat/index.html', {})
+
+def room(request, room_name):
+    return render(request, 'chat/room.html', {
+        'room_name': room_name
+    })
+
+def get_frame():
+    camera = cv2.VideoCapture(0)
+    font = cv2.FONT_HERSHEY_TRIPLEX #Creates a font
+    
+    while True:
+        _, frame = camera.read()
+        
+        
+        results = tfnet.return_predict(frame)
+        for result in results:
+            if result["confidence"]:
                 x = result["topleft"]["x"]
                 y = result["topleft"]["y"]
                 w = result["bottomright"]["x"]
                 h = result["bottomright"]["y"]
-                
-                new_img = cv2.cvtColor(imgcv[y:y+h, x:x+w], cv2.COLOR_BGR2RGB)
-                prediction = Detector.get_colors(new_img,3,False)
-                #prediction_text = ""
+                cv2.rectangle(frame, (x,y), (w,h), (255, 0, 0), 2) 
+                new_img = cv2.cvtColor(frame[y:h, x:w], cv2.COLOR_RGB2BGR)     
+                text = Detector.convert_image(new_img)
+                cv2.putText(frame, text, (x,y-20), font, 0.7, (0,0,0))
+        
+        imgencode=cv2.imencode('.jpg',frame)[1]
+        stringData = imgencode.tostring()
+        yield(b'--frame\r\n'b'Content-Type: text/plain\r\n\r\n'+stringData+b'\r\n')
+         
+    del(camera)
 
-                if result["confidence"] > 0.5:
-                    cv2.rectangle(imgcv, (x,y), (w,h), (255, 0, 0), 2)
-                    #print(len(prediction))
-                    cv2.putText(imgcv, color.findNearestWebColorName((prediction[0][0],prediction[0][1],prediction[0][2])), (x,y-60), font, 0.7, (0,0,0))
-                    cv2.putText(imgcv, color.findNearestWebColorName((prediction[1][0],prediction[1][1],prediction[1][2])), (x,y-40), font, 0.7, (0,0,0))
-                    cv2.putText(imgcv, color.findNearestWebColorName((prediction[2][0],prediction[2][1],prediction[2][2])), (x,y-20), font, 0.7, (0,0,0))
-                    #print(prediction)
-            data = cv2.imencode('.jpg', imgcv)[1].tobytes()
-            return HttpResponse(data, content_type="image/jpg")
+def indexScreen(request):
+    try:
+        template = "screen.html"
+        return render(request, "screen.html")
+    except HttpResponseServerError:
+        print("error")
+
+@gzip.gzip_page
+def dynamic_stream(request,stream_path='video'):
+    try :
+        return StreamingHttpResponse(get_frame(), content_type='multipart/x-mixed-replace;boundary=frame')
+    except:
+        return "error"
+
+
+class JSONImage(APIView):
+    def post(self, request):
+        #url = request.POST.get('image_url','')
+        image_file = request.FILES['image'].read()
+        img = cv2.imdecode(np.fromstring(image_file, np.uint8), cv2.IMREAD_UNCHANGED)
+        #img = cv2.imdecode(npimg, cv2.COLOR_BGR2RGB)
+        h, w, _ = img.shape
+        thick = int((h + w) // 300)
+
+        if image_file:
+            imgcv = img
+            results = tfnet.return_predict(imgcv)
+            font = cv2.FONT_HERSHEY_TRIPLEX #Creates a font
+
+            for result in results:
+            
+                if result["confidence"]:
+                    x = result["topleft"]["x"]
+                    y = result["topleft"]["y"]
+                    w = result["bottomright"]["x"]
+                    h = result["bottomright"]["y"]
+                    
+                    new_img = imgcv[y:h, x:w]
+                    text = Detector.convert_image(new_img)
+                    result['color'] = text     
+                        
+
+            return Response(results)
+                    
+
         else:
             return Response("No image")
 
-    def RGB2HEX(color):
+    def convert_image(src_image):
+        # load the image
+        image = src_image
+
+        chans = cv2.split(image)
+        colors = ('b', 'g', 'r')
+        features = []
+        feature_data = ''
+        counter = 0
+        for (chan, color) in zip(chans, colors):
+            counter = counter + 1
+
+            hist = cv2.calcHist([chan], [0], None, [256], [0, 256])
+            features.extend(hist)
+
+            # find the peak pixel values for R, G, and B
+            elem = np.argmax(hist)
+
+            if counter == 1:
+                blue = str(elem)
+            elif counter == 2:
+                green = str(elem)
+            elif counter == 3:
+                red = str(elem)
+                feature_data = [red, green, blue]
+                #print("feature", feature_data)
+
+        #print(feature_data[0])
+        #print(feature_data[1])
+        #print(feature_data[2])
         
-        return "#{:02x}{:02x}{:02x}".format(int(color[0]), int(color[1]), int(color[2]))
+        return JSONImage.getColorName(int(feature_data[0]), int(feature_data[1]), int(feature_data[2]))
+    
+    #function to calculate minimum distance from all colors and get the most matching color
+    def getColorName(R,G,B):
+        minimum = 10000
+        for i in range(len(csv)):
+            d = abs(R- int(csv.loc[i,"R"])) + abs(G- int(csv.loc[i,"G"]))+ abs(B- int(csv.loc[i,"B"]))
+            if(d<=minimum):
+                minimum = d
+                cname = csv.loc[i,"color_name"]
+        #print(cname)
+        return cname
 
-    def get_colors(image, number_of_colors, show_chart):
-        modified_image = cv2.resize(image, (600, 400), interpolation = cv2.INTER_AREA)
-        modified_image = modified_image.reshape(modified_image.shape[0]*modified_image.shape[1], 3)
+    def dominantColors(img, clusters):
+    
+        #read image
+        #img = cv2.imread("D:/programming/darkflow/sample_computer.jpg")
+        
+        #convert to rgb from bgr
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                
+        #reshaping to a list of pixels
+        img = img.reshape((img.shape[0] * img.shape[1], 3))
+        
+        #save image after operations
+        IMAGE = img
+        
+        #using k-means to cluster pixels
+        kmeans = KMeans(n_clusters = clusters)
+        kmeans.fit(img)
+        
+        #the cluster centers are our dominant colors.
+        COLORS = kmeans.cluster_centers_
+        
+        #save labels
+        LABELS = kmeans.labels_
+        
+        #returning after converting to integer from float
+        color = COLORS.astype(int)
 
-        clf = KMeans(n_clusters = number_of_colors)
-        labels = clf.fit_predict(modified_image)
+        return color
 
-        counts = Counter(labels)
+class JSONVideo(APIView):
+    def handle_uploaded_file(f):
+        currentDirectory = os.getcwd()
+        with open(os.path.join(currentDirectory, 'test.mp4'), 'wb+') as destination:
+            destination.write(f)
+        
+    def post(self, request):
+        currentDirectory = os.getcwd()
+        cap = request.FILES['video'].read()
+        Video.handle_uploaded_file(cap)
+        cap = cv2.VideoCapture(os.path.join(currentDirectory, 'test.mp4'))
+        frame_width = int(cap.get(3))
+        frame_height = int(cap.get(4))
+        frameRate = cap.get(5) #frame rate
+        
+        out = cv2.VideoWriter('out.mp4',cv2.VideoWriter_fourcc(*'MP4V'), 30, (frame_width,frame_height), 1)
+        font = cv2.FONT_HERSHEY_SIMPLEX #Creates a font
+        
+        count = 0
+        datas = []
+        while(cap.isOpened()):
+            frameId = cap.get(1) #current frame number
+            ret, frame = cap.read()
+            print(count)
+            if ret==True:
+                # write the flipped frame
+                results = tfnet.return_predict(frame)
+                for result in results:
+                    if result["confidence"]:
+                        x = result["topleft"]["x"]
+                        y = result["topleft"]["y"]
+                        w = result["bottomright"]["x"]
+                        h = result["bottomright"]["y"]
+                        new_img = cv2.cvtColor(frame[y:h, x:w], cv2.COLOR_RGB2BGR)     
+                        text = Detector.convert_image(new_img)
+                        result['color'] = text
+                    
+                count += 1
+                datas.append(results)
+            else:
+                break
+                
+        return Response(datas)
+        
 
-        center_colors = clf.cluster_centers_
-        # We get ordered colors by iterating through the keys
-        ordered_colors = [center_colors[i] for i in counts.keys()]
-        hex_colors = [Detector.RGB2HEX(ordered_colors[i]) for i in counts.keys()]
-        rgb_colors = [ordered_colors[i] for i in counts.keys()]
-        if (show_chart):
-            plt.figure(figsize = (8, 6))
-            plt.pie(counts.values(), labels = hex_colors, colors = hex_colors)
-        return rgb_colors
+class Video(APIView):
+    def handle_uploaded_file(f):
+        currentDirectory = os.getcwd()
+        with open(os.path.join(currentDirectory, 'test.mp4'), 'wb+') as destination:
+            destination.write(f)
+
+    def checkIfMobile(width, height):
+        if width > 640 and height > 480:
+            return False
+        else:
+            return True
+                
+
+    def get(self, request):
+        file = open('out.mp4', 'rb').read()
+        response = HttpResponse(file, content_type='video/mp4')
+        response['Content-Disposition'] = 'attachment; filename=out.mp4'
+        return response
+        
+    def post(self, request):
+        currentDirectory = os.getcwd()
+        cap = request.FILES['video'].read()
+        Video.handle_uploaded_file(cap)
+        # with open("test.mp4", "rb") as videoFile:
+        #     text = base64.b64encode(videoFile.read())
+        #     file = open("stream.txt", "wb") 
+        #     file.write(text)
+        #     file.close()
+
+
+        cap = cv2.VideoCapture(os.path.join(currentDirectory, 'test.mp4'))
+        frame_width = int(cap.get(3))
+        frame_height = int(cap.get(4))
+        frameRate = cap.get(5) #frame rate
+        
+        out = cv2.VideoWriter('out.mp4',cv2.VideoWriter_fourcc(*'MP4V'), 30, (frame_width,frame_height), 1)
+        font = cv2.FONT_HERSHEY_SIMPLEX #Creates a font
+
+        mobile = Video.checkIfMobile(frame_width, frame_height)
+
+        thin = 2
+        font_size = 0.7
+
+        if not mobile:
+            thin = 8
+            font_size = 3
+
+        
+        count = 0
+        while(cap.isOpened()):
+            frameId = cap.get(1) #current frame number
+            ret, frame = cap.read()
+            #print(count)
+            if ret==True:
+                results = tfnet.return_predict(frame)
+                for result in results:
+                    if result["confidence"]:
+                        x = result["topleft"]["x"]
+                        y = result["topleft"]["y"]
+                        w = result["bottomright"]["x"]
+                        h = result["bottomright"]["y"]
+                        cv2.rectangle(frame, (x,y), (w,h), (255, 0, 0), thin) 
+                        new_img = cv2.cvtColor(frame[y:h, x:w], cv2.COLOR_RGB2BGR)     
+                        text = Detector.convert_image(new_img)
+                        cv2.putText(frame, text, (x,y-20), font, font_size, (0,0,0))
+                print(count)     
+                out.write(frame)
+                
+                count += 1
+            else:
+                break
+
+        print("***********RESOLUTION**************")
+        print(frame_width)
+        print(frame_height)
+                
+        cap.release()
+        out.release()
+        cv2.destroyAllWindows()
+        file = open(os.path.join(currentDirectory, 'out.mp4'), 'rb').read()
+        response = HttpResponse(file, content_type='video/mp4')
+        response['Content-Disposition'] = 'attachment; filename=out.mp4'
+        return response
+        # file_name = 'out.avi'
+        # path_to_file = 'C:/Users/enrik.p.sabalvaro/Desktop/LiveStreamSocketIO/webserver/'
+        # response = HttpResponse(mimetype='application/force-download')
+        # response['Content-Disposition'] = 'attachment; filename=%s' % smart_str(file_name)
+        # response['X-Sendfile'] = smart_str(path_to_file)
+        # return response
+        
+class Frame(APIView):
+    @gzip.gzip_page
+    def get(self, request):
+        try:
+            return StreamingHttpResponse(VideoCamera.gen(VideoCamera()), content_type="multipart/x-mixed-replace;boundary=frame")
+        except:  # This is bad! replace it with proper handling
+            pass
+
+class Detector(APIView):
+    def post(self, request):
+        #url = request.POST.get('image_url','')
+        image_file = request.FILES['image'].read()
+        img = cv2.imdecode(np.fromstring(image_file, np.uint8), cv2.IMREAD_UNCHANGED)
+        #img = cv2.imdecode(image_file, cv2.COLOR_BGR2RGB)
+        h, w, _ = img.shape
+
+        if image_file:
+            imgcv = img
+            results = tfnet.return_predict(imgcv)
+            font = cv2.FONT_HERSHEY_TRIPLEX #Creates a font
+
+            for result in results:
+            
+                if result["confidence"]:
+                    x = result["topleft"]["x"]
+                    y = result["topleft"]["y"]
+                    w = result["bottomright"]["x"]
+                    h = result["bottomright"]["y"]
+                    
+                    new_img = imgcv[y:h, x:w]
+                    text = Detector.convert_image(new_img)
+                    cv2.rectangle(imgcv, (x,y), (w,h), (255, 0, 0), 10)
+                    #print(len(prediction))
+                    
+                    
+                    cv2.putText(imgcv, text, (x,y-12), 0, 1e-3 * h + 5, (0,0,0), 25)
+            # full_path = os.path.dirname(os.path.realpath(__file__))
+            # path = "D:/programming/Color Detection/LiveStreamSocketIO/webserver/server/static/"
+            # path_file = '/static/test.jpg'
+            # cv2.imwrite(r'D:\programming\Color Detection\LiveStreamSocketIO\webserver\server\static\test.jpg', imgcv)
+            # return HttpResponse(path_file)
+            data = cv2.imencode('.jpg', imgcv)[1].tobytes()
+            return HttpResponse(data, content_type="image/jpg")
+            return HttpResponse(path_file, content_type="application/json")
+        else:
+            return Response("No image")
+
+    def convert_image(src_image):
+        # load the image
+        image = src_image
+
+        chans = cv2.split(image)
+        colors = ('b', 'g', 'r')
+        features = []
+        feature_data = ''
+        counter = 0
+        for (chan, color) in zip(chans, colors):
+            counter = counter + 1
+
+            hist = cv2.calcHist([chan], [0], None, [256], [0, 256])
+            features.extend(hist)
+
+            # find the peak pixel values for R, G, and B
+            elem = np.argmax(hist)
+
+            if counter == 1:
+                blue = str(elem)
+            elif counter == 2:
+                green = str(elem)
+            elif counter == 3:
+                red = str(elem)
+                feature_data = [red, green, blue]
+                #print("feature", feature_data)
+
+        #print(feature_data[0])
+        #print(feature_data[1])
+        #print(feature_data[2])
+        
+        return Detector.getColorName(int(feature_data[0]), int(feature_data[1]), int(feature_data[2]))
+    
+    #function to calculate minimum distance from all colors and get the most matching color
+    def getColorName(R,G,B):
+        minimum = 10000
+        for i in range(len(csv)):
+            d = abs(R- int(csv.loc[i,"R"])) + abs(G- int(csv.loc[i,"G"]))+ abs(B- int(csv.loc[i,"B"]))
+            if(d<=minimum):
+                minimum = d
+                cname = csv.loc[i,"color_name"]
+        #print(cname)
+        return cname
+
+
+class VideoCamera(object):
+    def __init__(self):
+        self.video = cv2.VideoCapture(0)
+        (self.grabbed, self.frame) = self.video.read()
+        threading.Thread(target=self.update, args=()).start()
+
+    def __del__(self):
+        self.video.release()
+
+    def get_frame(self):
+        image = self.frame
+        ret, jpeg = cv2.imencode('.jpg', image)
+        return jpeg.tobytes()
+
+    def update(self):
+        while True:
+            (self.grabbed, self.frame) = self.video.read()
+
+    def gen(camera):
+        cam = VideoCamera()
+        while True:
+            frame = cam.get_frame()
+            yield(b'--frame\r\n'
+                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
+
+
+    
+

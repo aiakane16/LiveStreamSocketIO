@@ -15,20 +15,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include, re_path
-from django.views.decorators.csrf import csrf_exempt
+from django.conf.urls import url
 
-from . import views
 from . import consumers
 
 
-urlpatterns = [
-    path('predict', csrf_exempt(views.Detector.as_view())),
-    path('imgpredict', csrf_exempt(views.JSONImage.as_view())),
-    path('vidpredict', csrf_exempt(views.JSONVideo.as_view())),
-    path('video', csrf_exempt(views.Video.as_view())),
-    path('frame', csrf_exempt(views.Frame.as_view())),
-    path('/(?P<stream_path>(.*?))/',views.dynamic_stream,name="videostream"),  
-    path('stream/',views.indexScreen),
-    path('write/',views.write),
-    path('local',views.local)
+websocket_urlpatterns = [
+    re_path('ws/live', consumers.ChatConsumer),
 ]
